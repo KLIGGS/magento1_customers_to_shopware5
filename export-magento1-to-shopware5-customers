@@ -1,0 +1,152 @@
+<?php
+
+#@author		Kliggs
+#@website		https://www.kliggs.de
+#@version		0.1.0
+#@magento		1.x
+#@coding		PSR-2: Coding Style Guide https://www.php-fig.org/psr/psr-2/
+#@legal		  Use on your own risk
+#@description
+
+/*
+
+Export Magento 1 customers for import in Shopware 5. Tested with 10.000 customers successfully
+
+Shopware uses bcrypt hash algorithm. User passwords only work if hash algorithm is md5 and
+comparison at Shopware 5 is equal to Magento 1
+
+As md5 hash is a one-way function you cannot revert to plain text password.
+
+Possible reasons why import to Shopware 5 fails.
+
+- xml syntax
+- missing mandatory input
+- input not matching Shopware requirements
+
+Try first with a small default data set if import works in general
+*/
+
+
+// PHP init vars  ////////////////////////////////////////////////////////////////////////
+
+ini_set('display_errors', 1);
+error_reporting(E_ALL | E_STRICT);
+set_time_limit(0);
+ini_set("memory_limit","2048M");
+
+
+// Magento init //////////////////////////////////////////////////////////////////////////
+
+require_once('../app/Mage.php');
+$storeId = Mage_Core_Model_App::ADMIN_STORE_ID;
+Mage::app()->setCurrentStore($storeId);
+Mage::app('admin');
+Mage::register('isSecureArea', 1);
+
+
+// $params = Mage::app()->getRequest()->getParams();
+
+
+// Vars Script ///////////////////////////////////////////////////////////////////////////
+
+// extend this to assign country codes to Shopware country codes
+$countryCodeTransfer = ["DE"=>"2"];
+
+$fromDate = '2018-10-01 00:00:00';
+$toDate = '2018-10-11';
+
+$fromDate = date('Y-m-d H:i:s', strtotime($fromDate));
+$toDate = date('Y-m-d H:i:s', strtotime($toDate));
+
+
+// Get Data ///////////////////////////////////////////////////////////////////////////
+
+$_customers = Mage::getModel('customer/customer')->getCollection();
+$_customers->addAttributeToFilter('created_at', array('from'=>$fromDate, 'to'=>$toDate));
+// $_customers->addAttributeToFilter('created_at',array('gt' => $fromDate));
+// $_customers->addFieldToFilter('customer_email', $email);
+$_customers->load();   
+
+
+$out = "";
+
+foreach ($_customers as $customer) {
+	  
+	  $customerId = $customer->getId();
+	  $customerDetails = Mage::getModel('customer/customer')->load($customerId);
+
+	  $customerEmail = $customerDetails->getEmail();
+	  $customerGender = $customerDetails->getGender();
+	  $customerPasswordHash = $customerDetails->getData('password_hash');
+	 
+
+	   $billingAddress  = Mage::getModel('customer/address')->load($customerDetails->getDefaultBilling());
+	   $billingCountry = htmlspecialchars($billingAddress->getData('country_id'));
+	   
+	   $shippingAddress  = Mage::getModel('customer/address')->load($customerDetails->getDefaultShipping());
+	   $shippingCountry = htmlspecialchars($shippingAddress->getData('country_id'));
+	   
+		$billingLastName = htmlspecialchars($billingAddress->getLastname());
+		
+		// custom for filter spam
+		$valid = true;
+		if (strpos($billingLastName, 'http:') == true) {
+			$valid = false;
+		}
+		
+		if ($valid) {
+		
+	   	$out .= '<customer>
+	   			<customernumber>' . $customerId . '</customernumber>
+				<email>' . htmlspecialchars($customerEmail) . '</email>
+				<password>' . $customerPasswordHash .'</password>
+				<encoder>md5</encoder>
+				<active>1</active>
+	   			<billing_company>' . htmlspecialchars($billingAddress->getCompany()).'</billing_company>
+				<billing_department></billing_department>
+				<billing_salutation></billing_salutation>
+				<billing_firstname>' . htmlspecialchars($billingAddress->getFirstname()). '</billing_firstname>
+				<billing_lastname>' . htmlspecialchars($billingAddress->getLastname()).'</billing_lastname>
+				<billing_street>' . htmlspecialchars($billingAddress->getData('street')) .'</billing_street>
+				<billing_zipcode>' . htmlspecialchars($billingAddress->getPostcode()). '</billing_zipcode>
+				<billing_city>' . htmlspecialchars($billingAddress->getCity()). '</billing_city>
+				<phone>' . htmlspecialchars($billingAddress->getTelephone()). '</phone>
+				<fax>' . htmlspecialchars($billingAddress->getFax()). '</fax>
+				<billing_countryID>' . $countryCodeTransfer[$billingCountry] . '</billing_countryID>
+				<billing_stateID></billing_stateID>
+				<ustid></ustid>
+	   			<shipping_company>' . htmlspecialchars($shippingAddress->getCompany()).'</shipping_company>
+	   			<shipping_department></shipping_department>
+	   			<shipping_salutation></shipping_salutation>
+	   			<shipping_firstname>' . htmlspecialchars($shippingAddress->getFirstname()). '</shipping_firstname>
+	   			<shipping_lastname>' . htmlspecialchars($shippingAddress->getLastname()).' </shipping_lastname>
+	   			<shipping_street>' . htmlspecialchars($shippingAddress->getData('street')) .'</shipping_street>
+				<shipping_zipcode>' . htmlspecialchars($shippingAddress->getPostcode()). '</shipping_zipcode>
+				<shipping_city>' . htmlspecialchars($shippingAddress->getCity()). '</shipping_city>
+				<shipping_countryID>' . $countryCodeTransfer[$shippingCountry] . '</shipping_countryID>
+				<paymentID>5</paymentID>
+				<newsletter>0</newsletter>
+				<accountmode>0</accountmode>
+				<customergroup>EK</customergroup>
+				<language>1</language>
+				<subshopID>1</subshopID>
+				</customer>';
+		}
+		
+	}
+
+// Shopware 5 XML default_customer import
+$xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Root>
+	<Header>
+		<HeaderChild></HeaderChild>
+	</Header>
+	<customers>
+	' . $out . '
+	</customers>
+</Root>';
+
+header('Content-Type: text/xml; charset=utf-8');
+header('Content-Disposition: attachment; filename=magento1-customer-export.xml');
+echo $xml;
+?>
