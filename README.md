@@ -3,15 +3,14 @@ Export of Magento 1 customers as XML file for importing to Shopware 5
 
 ## INTRODUCTION
 
-Shopware uses bcrypt hash algorithm. User passwords only work if hash algorithm is md5 and
-comparison at Shopware 5 is equal to Magento 1
-
-As md5 hash is a one-way function you cannot revert to plain text password.
+Export Magneto 1 Users as XML File to import in Shopware 5. Shopware uses bcrypt hash algorithm. User passwords only work if hash algorithm is md5 and
+comparison at Shopware 5 is equal to Magento 1. As md5 hash is a one-way function you cannot revert to plain text password.
 
 ## REQUIREMENTS
 
 - Magento 1.x
 - Shopware 5
+- Sufficient RAM
 
 ## INSTALLATION
 
