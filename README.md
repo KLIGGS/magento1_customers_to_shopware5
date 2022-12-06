@@ -1,4 +1,4 @@
-# Magento 1 API Script export customers
+# Magento 1 Script export customers
 Export of Magento 1 customers as XML file for importing to Shopware 5
 
 ## INTRODUCTION
